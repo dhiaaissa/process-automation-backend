@@ -6,7 +6,7 @@ const actionSchema = new mongoose.Schema(
 );
 
 const stepSchema = new mongoose.Schema(
-  { order: Number, description: String },
+  { order: Number, description: String, type: String, actor: String },
   { _id: false }
 );
 
@@ -15,6 +15,10 @@ const recommendationSchema = new mongoose.Schema(
     condition: String,
     suggestion: String,
     priority: { type: String, enum: ['high', 'medium', 'low'] },
+    impact: { type: Number, min: 1, max: 5 },
+    effort: { type: Number, min: 1, max: 5 },
+    phase: { type: String, enum: ['court-terme', 'moyen-terme', 'long-terme'] },
+    tools: [String],
   },
   { _id: false }
 );
@@ -50,6 +54,11 @@ const processSchema = new mongoose.Schema(
         totalActions: { type: Number, default: 0 },
         repetitiveTaskCount: { type: Number, default: 0 },
         humanInterventionCount: { type: Number, default: 0 },
+        systemStepCount: { type: Number, default: 0 },
+        manualStepCount: { type: Number, default: 0 },
+        decisionPointCount: { type: Number, default: 0 },
+        automationReadiness: { type: Number, default: 0 },
+        complexityLevel: { type: String, enum: ['faible', 'moyenne', 'élevée'] },
       },
     },
     scoring: {
@@ -70,6 +79,16 @@ const processSchema = new mongoose.Schema(
       },
     },
     recommendations: [recommendationSchema],
+    costEstimation: {
+      manualCostPerExecution: { type: Number, default: 0 },
+      executionsPerMonth: { type: Number, default: 0 },
+      averageTimeMinutes: { type: Number, default: 0 },
+      estimatedAutomationCost: { type: Number, default: 0 },
+      monthlySavings: { type: Number, default: 0 },
+      annualSavings: { type: Number, default: 0 },
+      roiPercentage: { type: Number, default: 0 },
+      paybackMonths: { type: Number, default: 0 },
+    },
   },
   { timestamps: true }
 );

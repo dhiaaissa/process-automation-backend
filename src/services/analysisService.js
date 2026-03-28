@@ -45,6 +45,57 @@ const TIME_PATTERNS = [
   /\b(rapidement|lentement|immédiatement|dans les \d+\s*\w+|quickly|slowly|immediately|within \d+\s*\w+)\b/gi,
 ];
 
+// --- Step Classification Patterns -------------------------------------------
+
+const SYSTEM_STEP_KEYWORDS = /\b(le système|système|system|automatiquement|automatically)\b/i;
+const MANUAL_STEP_KEYWORDS = /\b(manuellement|manuel(?:le)?|à la main|manually|manual)\b/i;
+const DECISION_STEP_KEYWORDS = /\b(approuve|rejette|ou rejette|ou approuve|décide|signe)\b/i;
+
+// --- Step Intelligence Helpers -----------------------------------------------
+
+/**
+ * Classify a step as automatisable, semi-automatisable, or manuel.
+ */
+function classifyStep(description) {
+  const isSystem = SYSTEM_STEP_KEYWORDS.test(description);
+  const isManual = MANUAL_STEP_KEYWORDS.test(description);
+  const isDecision = DECISION_STEP_KEYWORDS.test(description);
+
+  if (isManual) return 'manuel';
+  if (isSystem && !isDecision) return 'automatisable';
+  if (isDecision) return 'semi-automatisable';
+  // If "le système" is the actor but no explicit keyword
+  if (/\b(le système|système)\b/i.test(description)) return 'automatisable';
+  return 'semi-automatisable';
+}
+
+/**
+ * Detect the main actor responsible for a step.
+ */
+function detectStepActor(description) {
+  const match = description.match(
+    /(?:Le |La |L'|Les )(système|manager|employé|employée|administrateur|admin|client|cliente|utilisateur|fournisseur|directeur|responsable|superviseur|chef|PDG|comité|bureau|secrétariat|direction|équipe)/i
+  );
+  if (match) {
+    const actor = match[1].toLowerCase();
+    return actor.charAt(0).toUpperCase() + actor.slice(1);
+  }
+  return null;
+}
+
+/**
+ * Calculate process complexity level from structural metrics.
+ */
+function calculateComplexityLevel(totalSteps, decisionPointCount, totalActors) {
+  const score =
+    Math.min(totalSteps / 5, 3) +
+    Math.min(decisionPointCount * 1.5, 4) +
+    Math.min(totalActors / 2, 3);
+  if (score >= 7) return 'élevée';
+  if (score >= 3.5) return 'moyenne';
+  return 'faible';
+}
+
 // --- Helpers ----------------------------------------------------------------
 
 /**
@@ -141,6 +192,25 @@ function analyzeProcess(text) {
   const humanInterventions = extractMatches(text, HUMAN_INTERVENTION_PATTERNS);
   const timeIndicators = extractMatches(text, TIME_PATTERNS);
 
+  // Classify each step and detect responsible actor
+  steps.forEach((step) => {
+    step.type = classifyStep(step.description);
+    step.actor = detectStepActor(step.description);
+  });
+
+  const systemStepCount = steps.filter((s) => s.type === 'automatisable').length;
+  const manualStepCount = steps.filter((s) => s.type === 'manuel').length;
+  const decisionPointCount = steps.filter((s) =>
+    DECISION_STEP_KEYWORDS.test(s.description)
+  ).length;
+  const automationReadiness =
+    steps.length > 0 ? Math.round((systemStepCount / steps.length) * 100) : 0;
+  const complexityLevel = calculateComplexityLevel(
+    steps.length,
+    decisionPointCount,
+    actors.length
+  );
+
   return {
     steps,
     actors,
@@ -154,6 +224,11 @@ function analyzeProcess(text) {
       totalActions: actions.length,
       repetitiveTaskCount: repetitiveTasks.length,
       humanInterventionCount: humanInterventions.length,
+      systemStepCount,
+      manualStepCount,
+      decisionPointCount,
+      automationReadiness,
+      complexityLevel,
     },
   };
 }
